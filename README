@@ -1,0 +1,6 @@
+SAMPLE CHAT BOT FOR GITTTER
+
+Install
+- Rename .sample.env to .env
+- Paste you gitter api key in .env (You can get it in developer.gitter.im)
+-
