@@ -4,7 +4,6 @@ import (
 	"github.com/ruelephant/gitterClient"
 	"github.com/subosito/gotenv"
 	"os"
-	"log"
 	"strings"
 	"strconv"
 	"math/rand"
@@ -16,7 +15,7 @@ func init() {
 }
 var results map[string]int;
 
-func messageHandler(chat gitterClient.ChatStruct, message gitterClient.MessageStruct) {
+func messageHandler(room gitterClient.RoomStruct, message gitterClient.MessageStruct) {
 	if (strings.Contains(message.Text, "крутите барабан") || strings.Contains(message.Text, "крутить барабан")) {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -24,16 +23,17 @@ func messageHandler(chat gitterClient.ChatStruct, message gitterClient.MessageSt
 
 		localSpore := roulette[r.Intn(len(roulette)-1)]
 		if (localSpore == -1) {
-			chat.SendMessage("@"+message.FromUser.Username+" Вы банкрот!")
+			room.SendMessage("@"+message.FromUser.Username+" Вы банкрот!")
 			delete(results, message.FromUser.ID)
 		} else {
-			chat.SendMessage("@"+message.FromUser.Username+"  У вас "+strconv.Itoa(localSpore)+" очков")
+			room.SendMessage("@"+message.FromUser.Username+"  У вас "+strconv.Itoa(localSpore)+" очков")
 			if oldValue, ok := results[message.FromUser.ID]; ok {
 				results[message.FromUser.ID] = localSpore+oldValue
 			} else {
 				results[message.FromUser.ID] = localSpore
 			}
 		}
+		return
 	}
 
 	if (strings.Contains(message.Text, "приз")) {
@@ -41,22 +41,26 @@ func messageHandler(chat gitterClient.ChatStruct, message gitterClient.MessageSt
 		if oldValue, ok := results[message.FromUser.ID]; ok {
 			count = oldValue;
 		}
-		chat.SendMessage("@"+message.FromUser.Username+" Всего вы заработали: "+strconv.Itoa(count)+" очков")
+		room.SendMessage("@"+message.FromUser.Username+" Всего вы заработали: "+strconv.Itoa(count)+" очков")
+		return
 	}
+	
+	room.SendMessage("@"+message.FromUser.Username+"  Не пойму о чем вы :(")
 }
 
 func main() {
 	results = make(map[string]int)
 	token := os.Getenv("GITTER_API_TOKEN")
-
-
+	
 	gitter := gitterClient.Create(token)
 
-
-	log.Print("Join channel debugChannel")
-	debugChannel := gitterClient.ChatStruct{ TokenApi: token, RoomId:"563b92da16b6c7089cb99c97", Channel: make(chan gitterClient.MessageStruct)  }
-	debugChannel.InfoMessage("Новая игра! Вы можете \"крутить барабан\" или получить \"приз\"", 60)
-	go debugChannel.JoinRoom()
+	debugRoom := gitter.NewRoom("563b92da16b6c7089cb99c97", make(chan gitterClient.MessageStruct))
+	debugRoom.InfoMessage("Новая игра! Вы можете \"крутить барабан\" или получить \"приз\"", 1)
+	go debugRoom.Join()
+	
+	gitterBotChannel := gitter.NewRoom("560281040fc9f982beb1908a", make(chan gitterClient.MessageStruct))
+	gitterBotChannel.InfoMessage("Новая игра! Вы можете \"крутить барабан\" или получить \"приз\"", 900)
+	go gitterBotChannel.Join()
 
 	/*
 		// Example - Second channel
@@ -70,8 +74,10 @@ func main() {
 
 	for {
 		select {
-			case message:=<-debugChannel.Channel:
-				messageHandler(debugChannel, message)
+			case message:=<-debugRoom.GetChannel():
+				messageHandler(debugRoom, message)
+			case message:=<-gitterBotChannel.GetChannel():
+				messageHandler(gitterBotChannel, message)
 			/*
 			case message:=<-secondChannel.Channel:
 				messageHandler(secondChannel.Channel, message)
