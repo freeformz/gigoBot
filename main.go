@@ -16,7 +16,7 @@ func init() {
 var results map[string]int;
 
 func messageHandler(room gitterClient.RoomStruct, message gitterClient.MessageStruct) {
-	if (strings.Contains(message.Text, "крутите барабан") || strings.Contains(message.Text, "крутить барабан")) {
+	if (strings.Contains(message.Text, "крутить") || strings.Contains(message.Text, "крути") || strings.Contains(message.Text, "крутите барабан") || strings.Contains(message.Text, "крутить барабан")) {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		roulette := [...]int{0,10,100,30,50,25,-1,0,50,0,10,25,5,150,-1,15,100,30,0,25,5,50,0,1000,150,25,10,30,-1,5,250,25,0,10,50,30,100,-1,25,50 }
@@ -36,7 +36,7 @@ func messageHandler(room gitterClient.RoomStruct, message gitterClient.MessageSt
 		return
 	}
 
-	if (strings.Contains(message.Text, "приз")) {
+	if (strings.Contains(message.Text, "результат")) {
 		count := 0
 		if oldValue, ok := results[message.FromUser.ID]; ok {
 			count = oldValue;
@@ -59,7 +59,8 @@ func main() {
 	go debugRoom.Join()
 	
 	gitterBotChannel := gitter.NewRoom("560281040fc9f982beb1908a", make(chan gitterClient.MessageStruct))
-	gitterBotChannel.InfoMessage("Новая игра! Вы можете \"крутить барабан\" или получить \"приз\"", 900)
+	gitterBotChannel.InfoMessage("Работает \"Барабан\", напишите \"крутить\" или \"результат\"", 900)
+	gitterBotChannel.InfoMessage("Новая игра! Вы можете получить бан (с) @Big-Shark", 1800)
 	go gitterBotChannel.Join()
 
 	/*
