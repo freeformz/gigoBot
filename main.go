@@ -4,18 +4,35 @@ import (
 	"github.com/ruelephant/gitterClient"
 	"github.com/subosito/gotenv"
 	"os"
-	"strings"
+	/*"strings"
 	"strconv"
 	"math/rand"
+	 */
+	"net/http"
+	"fmt"
+	"html"
+	"sync"
+	"log"
 	"time"
 )
 
 func init() {
 	gotenv.Load()
 }
+
 var results map[string]int;
 
-func messageHandler(room gitterClient.RoomStruct, message gitterClient.MessageStruct) {
+/*
+func defaultMessageHandler(room gitterClient.RoomStruct, message gitterClient.MessageStruct) {
+	if (strings.Contains(message.Text, "результат") || strings.Contains(message.Text, "крутить") || strings.Contains(message.Text, "крути") || strings.Contains(message.Text, "крутите барабан") || strings.Contains(message.Text, "крутить барабан")) {
+		room.SendMessage("@"+message.FromUser.Username+" Рулетка доступна только на [специальном канале](https://gitter.im/GigoBot/rulegame) ")
+		return
+	}
+
+	room.SendMessage("@"+message.FromUser.Username+"  Не пойму о чем вы :(")
+}
+
+func ruleGameHandler(room gitterClient.RoomStruct, message gitterClient.MessageStruct) {
 	if (strings.Contains(message.Text, "крутить") || strings.Contains(message.Text, "крути") || strings.Contains(message.Text, "крутите барабан") || strings.Contains(message.Text, "крутить барабан")) {
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -48,42 +65,93 @@ func messageHandler(room gitterClient.RoomStruct, message gitterClient.MessageSt
 	room.SendMessage("@"+message.FromUser.Username+"  Не пойму о чем вы :(")
 }
 
+*/
+
+type gigoBot struct {
+	rooms []*gitterClient.RoomStruct;
+}
+
+
+func (bot *gigoBot)InfoMessage(room *gitterClient.RoomStruct, Message string, second int) (*time.Ticker) {
+	ticker := time.NewTicker(time.Duration(second) * time.Second)
+	go func() {
+		for range ticker.C {
+			room.SafeSendMessage(Message)
+		}
+	}()
+	return ticker
+}
+
+func (bot *gigoBot)AddLisner(room *gitterClient.RoomStruct) {
+	bot.rooms = append(bot.rooms, room)
+	go room.Join()
+}
+
+func (bot *gigoBot)messageHandler(room *gitterClient.RoomStruct, message gitterClient.MessageStruct) {
+	room.SendMessage("@"+message.FromUser.Username+"  Не пойму о чем вы :(")
+}
+
+//	gameRoom.InfoMessage("Работает \"Барабан\", напишите \"крутить\" или \"результат\"", 900)
+func (bot *gigoBot)ChatLister() {
+	defer wg.Done()
+	for {
+		for _, room := range bot.rooms  {
+			select {
+				case message := <-room.GetChannel():
+					bot.messageHandler(room, message)
+				default:
+
+			}
+		}
+	}
+}
+
+func (bot *gigoBot)WebInterfaceLisner(webserverPort string) {
+	defer wg.Done()
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
+	})
+	if (webserverPort == "") {
+		webserverPort = "8080"
+	}
+	http.ListenAndServe(":"+webserverPort, serverMux)
+}
+
+var wg sync.WaitGroup
+
 func main() {
 	results = make(map[string]int)
 	token := os.Getenv("GITTER_API_TOKEN")
-	
+	webserverPort := os.Getenv("PORT")
+
 	gitter := gitterClient.Create(token)
 
-	debugRoom := gitter.NewRoom("563b92da16b6c7089cb99c97", make(chan gitterClient.MessageStruct))
-	debugRoom.InfoMessage("Новая игра! Вы можете \"крутить барабан\" или получить \"приз\"", 1)
-	go debugRoom.Join()
-	
-	gitterBotChannel := gitter.NewRoom("560281040fc9f982beb1908a", make(chan gitterClient.MessageStruct))
-	gitterBotChannel.InfoMessage("Работает \"Барабан\", напишите \"крутить\" или \"результат\"", 900)
-	gitterBotChannel.InfoMessage("Новая игра! Вы можете получить бан (с) @Big-Shark", 1800)
-	go gitterBotChannel.Join()
+	bot := &gigoBot{}
+	if err,room:=gitter.NewRoom("LaravelRUS/GitterBot");err == nil {
+		bot.AddLisner(&room)
+	} else {
+		log.Fatal(err)
+	}
+
+	if err,room:=gitter.NewRoom("GigoBot/RuleGame");err == nil {
+		bot.InfoMessage(&room, "Работает \"Барабан\", напишите \"крутить\" или \"результат\"", 900)
+		bot.AddLisner(&room)
+	} else {
+		log.Fatal(err)
+	}
 
 	/*
-		// Example - Second channel
-		// You can get channel id in (open in browser) https://api.gitter.im/v1/rooms?access_token={YOU_TOKEN}
-		// Previously join to the channel with the gitter client (gitter.im)
+		- Add Leave method:
 
-		log.Print("Join channel myChannel")
-		secondChannel := GitterClient.Chat{ TokenApi: token, RoomId:"{PASTE YOU CHANNEL ID}", Channel: make(chan string)  }
-		go secondChannel.JoinRoom()
+		Request URL:https://gitter.im/api/v1/rooms/563b92da16b6c7089cb99c97/users/54ddf4ce15522ed4b3dbf9e0
+		Request Method:DELETE
+
+		- LS support
+		- Монопольные каналы
 	 */
-
-	for {
-		select {
-			case message:=<-debugRoom.GetChannel():
-				messageHandler(debugRoom, message)
-			case message:=<-gitterBotChannel.GetChannel():
-				messageHandler(gitterBotChannel, message)
-			/*
-			case message:=<-secondChannel.Channel:
-				messageHandler(secondChannel.Channel, message)
-				*/
-			default:
-		}
-	}
+	wg.Add(2)
+	go bot.WebInterfaceLisner(webserverPort)
+	go bot.ChatLister()
+	wg.Wait()
 }
