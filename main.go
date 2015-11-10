@@ -71,7 +71,6 @@ type gigoBot struct {
 	rooms []*gitterClient.RoomStruct;
 }
 
-
 func (bot *gigoBot)InfoMessage(room *gitterClient.RoomStruct, Message string, second int) (*time.Ticker) {
 	ticker := time.NewTicker(time.Duration(second) * time.Second)
 	go func() {
@@ -88,6 +87,7 @@ func (bot *gigoBot)AddLisner(room *gitterClient.RoomStruct) {
 }
 
 func (bot *gigoBot)messageHandler(room *gitterClient.RoomStruct, message gitterClient.MessageStruct) {
+	log.Print(message.FromUser.Username, " -> ", room.Url, ": ", message.Text)
 	room.SendMessage("@"+message.FromUser.Username+"  Не пойму о чем вы :(")
 }
 
@@ -97,7 +97,7 @@ func (bot *gigoBot)ChatLister() {
 	for {
 		for _, room := range bot.rooms  {
 			select {
-				case message := <-room.GetChannel():
+				case message := <-room.MessageChannel:
 					bot.messageHandler(room, message)
 				default:
 
@@ -125,16 +125,20 @@ func main() {
 	token := os.Getenv("GITTER_API_TOKEN")
 	webserverPort := os.Getenv("PORT")
 
-	gitter := gitterClient.Create(token)
-
 	bot := &gigoBot{}
-	if err,room:=gitter.NewRoom("LaravelRUS/GitterBot");err == nil {
+
+	gitter := gitterClient.Create(token)
+	gitter.PmCallback(func(room gitterClient.RoomStruct) {
+		bot.AddLisner(&room)
+	})
+
+	if err,room:=gitter.NewRoom("/LaravelRUS/GitterBot", false);err == nil {
 		bot.AddLisner(&room)
 	} else {
 		log.Fatal(err)
 	}
 
-	if err,room:=gitter.NewRoom("GigoBot/RuleGame");err == nil {
+	if err,room:=gitter.NewRoom("/GigoBot/RuleGame", true);err == nil {
 		bot.InfoMessage(&room, "Работает \"Барабан\", напишите \"крутить\" или \"результат\"", 900)
 		bot.AddLisner(&room)
 	} else {
