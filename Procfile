@@ -1,1 +1,1 @@
-web: gigoBot
+worker: gigoBot
