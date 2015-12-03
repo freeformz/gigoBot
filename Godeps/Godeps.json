@@ -1,0 +1,15 @@
+{
+	"ImportPath": "github.com/ruelephant/gigoBot",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/ruelephant/gitterClient",
+			"Rev": "632e84af6a3df44ccd2ff015c60ece845f5b0f35"
+		},
+		{
+			"ImportPath": "github.com/subosito/gotenv",
+			"Comment": "v1.0.0",
+			"Rev": "61aa1800e632021fa192da0379ddb78bbd5390d9"
+		}
+	]
+}
